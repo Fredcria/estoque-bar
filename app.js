@@ -382,14 +382,23 @@ async function salvarInventario(){
     stopLoad();
     toast('Inventário salvo! '+enviados+' produtos gravados.'+(erros>0?' ('+erros+' erros)':''));
 
-    // Recarregar dados após 3 segundos
+    // Recarregar dados e ir para aba Estoque para confirmar
     setTimeout(function(){
       loading('Atualizando dados...');
       carregar().then(function(){
         stopLoad();
+        // Ir para aba Estoque para mostrar o resultado
+        document.querySelectorAll('.tab').forEach(function(b){b.className='tab';});
+        document.querySelectorAll('.pane').forEach(function(p){p.className='pane';});
+        var tabEst=document.querySelector('[data-pane="estoque"]');
+        if(tabEst){ tabEst.className='tab on'; }
+        var paneEst=document.getElementById('pane-estoque');
+        if(paneEst){ paneEst.className='pane on'; }
+        renderEstoque();
+        toast('Inventário salvo e aplicado! Veja o estoque atualizado.');
       }).catch(function(){
         stopLoad();
-        toast('Dados salvos. Toque em Sincronizar para atualizar.',false);
+        toast('Salvo! Toque em Sincronizar (↺) para ver os dados atualizados.');
       });
     },3000);
 
