@@ -1,5 +1,5 @@
-var CACHE = 'estoque-bar-v2';
-var ASSETS = ['./', './index.html', './app.js',
+var CACHE = 'estoque-bar-v3';
+var ASSETS = ['./', './index.html', './app2.js',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js'];
 
 self.addEventListener('install', function(e){
