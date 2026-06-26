@@ -348,7 +348,6 @@ async function salvarInventario(){
   if(!data){ toast('Selecione a data do inventário',false); return; }
   if(!confirm('Confirmar inventário de '+fmt(data)+'? Isso vai substituir qualquer inventário desta data e virar o novo ponto zero do estoque.')) return;
 
-  // Montar todas as linhas
   var rows=[];
   db.produtos.forEach(function(p){
     var esp=calcEsperado(p.sku,data);
@@ -358,42 +357,48 @@ async function salvarInventario(){
   });
 
   var total=rows.length;
-  var LOTE=25; // 25 produtos por envio para não estourar o timeout do Apps Script
+  var LOTE=25;
   var enviados=0;
+  var erros=0;
 
+  loading('Apagando inventário anterior...');
   try{
-    // Primeiro envio: apaga inventário do dia e grava o primeiro lote
-    loading('Salvando inventário... 0/'+total);
-    var primeiro=rows.slice(0,LOTE);
-    var r=await api_post({action:'salvarInventario',data:data,rows:primeiro});
-    if(r.error){ toast('Erro: '+r.error,false); stopLoad(); return; }
-    enviados+=primeiro.length;
+    // Lote 1: apaga o dia e grava os primeiros 25
+    var r1=await api_post({action:'salvarInventario',data:data,rows:rows.slice(0,LOTE)});
+    if(r1.error){ toast('Erro: '+r1.error,false); stopLoad(); return; }
+    enviados+=Math.min(LOTE,total);
 
-    // Lotes seguintes: apenas append (não apaga mais)
-    var i=LOTE;
-    while(i<rows.length){
+    // Lotes seguintes
+    for(var i=LOTE;i<rows.length;i+=LOTE){
+      loading('Gravando... '+enviados+' de '+total+' produtos');
       var lote=rows.slice(i,i+LOTE);
-      loading('Salvando inventário... '+enviados+'/'+total);
       var r2=await api_post({action:'appendInventario',data:data,rows:lote});
-      if(r2 && r2.error){ toast('Erro no lote: '+r2.error,false); stopLoad(); return; }
-      enviados+=lote.length;
-      i+=LOTE;
+      if(r2 && r2.error){ erros++; }
+      else{ enviados+=lote.length; }
     }
 
+    // Limpar rascunho e avisar
     invRascunho={};
-    toast('Inventário salvo! '+total+' produtos gravados.');
     stopLoad();
-    // Recarregar com delay para dar tempo ao Apps Script processar
-    setTimeout(async function(){
+    toast('Inventário salvo! '+enviados+' produtos gravados.'+(erros>0?' ('+erros+' erros)':''));
+
+    // Recarregar dados após 3 segundos
+    setTimeout(function(){
       loading('Atualizando dados...');
-      try{ await carregar(); }
-      catch(e){ stopLoad(); }
-    }, 2000);
+      carregar().then(function(){
+        stopLoad();
+      }).catch(function(){
+        stopLoad();
+        toast('Dados salvos. Toque em Sincronizar para atualizar.',false);
+      });
+    },3000);
+
   }catch(e){
-    toast('Erro de conexão: '+e.message,false);
     stopLoad();
+    toast('Erro: '+e.message,false);
   }
 }
+
 
 // ---- CONTAGEM DIÁRIA ----
 var cntTotais={};
