@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Estoque Bar">
+<meta name="theme-color" content="#1F3864">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<title>Estoque Bar</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{--navy:#1F3864;--red:#c0392b;--green:#1e8449;--gold:#f39c12;--bg:#f4f6f9;--card:#fff;--border:#e0e0e0;--text:#111;--muted:#666;}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:15px;}
+
+/* SETUP */
+#setup{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;}
+.setup-box{background:var(--card);border-radius:16px;padding:28px 24px;max-width:440px;width:100%;box-shadow:0 2px 12px rgba(0,0,0,.1);}
+.setup-box h1{font-size:20px;font-weight:600;color:var(--navy);margin-bottom:6px;}
+.setup-box p{font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.5;}
+.setup-box ol{font-size:13px;color:var(--muted);padding-left:18px;margin-bottom:20px;line-height:2.2;}
+.setup-box code{background:#f0f2f5;padding:2px 6px;border-radius:4px;font-family:monospace;font-size:12px;}
+.setup-box input{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;margin-bottom:12px;}
+.btn-primary{width:100%;padding:13px;background:var(--navy);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:rgba(255,255,255,.88);z-index:99;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+.spinner{width:36px;height:36px;border:3px solid #ddd;border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* APP */
+#app{display:none;}
+header{background:var(--navy);color:#fff;padding:12px 16px;position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;}
+header h1{flex:1;font-size:16px;font-weight:600;}
+header button{background:rgba(255,255,255,.15);border:none;color:#fff;padding:6px 10px;border-radius:8px;font-size:13px;cursor:pointer;}
+#btnInstalar{display:none;background:#f39c12;}
+
+/* TABS */
+.tabs{background:#fff;border-bottom:1px solid var(--border);display:flex;overflow-x:auto;position:sticky;top:48px;z-index:19;}
+.tab{padding:11px 14px;border:none;background:none;font-size:14px;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent;font-weight:500;}
+.tab.on{color:var(--navy);border-bottom-color:var(--navy);}
+.pane{display:none;padding:14px;padding-bottom:90px;}
+.pane.on{display:block;}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px;}
+.kpi{background:var(--card);border-radius:12px;padding:13px;border:1px solid var(--border);}
+.kpi .lbl{font-size:12px;color:var(--muted);margin-bottom:3px;}
+.kpi .val{font-size:20px;font-weight:700;}
+.kpi.red .val{color:var(--red);}
+.kpi.green .val{color:var(--green);}
+.kpi.gold .val{color:var(--gold);}
+.sec{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px;}
+.chart-wrap{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:12px;margin-bottom:12px;}
+
+/* FILTROS */
+.srch-row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.srch{flex:1;min-width:140px;padding:10px 13px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;background:#fff;}
+.srch-row select,.filter-sel{padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;background:#fff;}
+.row-date{display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;}
+.row-date label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:3px;}
+.row-date input[type=date]{padding:8px 10px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;background:#fff;}
+
+/* TABELAS */
+.tscroll{overflow-x:auto;border-radius:10px;border:1px solid var(--border);background:var(--card);}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{padding:9px 10px;text-align:left;color:var(--muted);font-weight:500;font-size:12px;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:8px 10px;border-bottom:1px solid #f5f5f5;vertical-align:middle;font-size:13px;}
+tr:last-child td{border:none;}
+.badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;}
+.badge.r{background:#fdecea;color:var(--red);}
+.badge.g{background:#e8f5e9;color:var(--green);}
+.badge.m{background:#f5f5f5;color:var(--muted);}
+.cat-tag{display:inline-block;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:600;background:#e8eef7;color:var(--navy);}
+.count-info{font-size:12px;color:var(--muted);margin-bottom:8px;}
+
+/* FORMS */
+.form-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:flex-end;}
+.form-row label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);}
+.form-row input,.form-row select{padding:9px 11px;border:1.5px solid var(--border);border-radius:9px;font-size:14px;background:#fff;color:var(--text);}
+.form-row .btn{padding:10px 16px;background:var(--navy);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap;}
+
+/* INVENTÁRIO */
+.inv-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid #f5f5f5;}
+.inv-row:last-child{border:none;}
+.inv-row.edited{background:#fff8e1;padding:8px 8px;border-radius:8px;margin:2px 0;border-bottom:none;}
+.inv-nome{flex:1;font-size:13px;line-height:1.3;}
+.inv-cat{font-size:10px;margin-top:2px;}
+.inv-esp{width:54px;text-align:center;font-size:14px;}
+.inv-inp{width:80px;padding:8px 6px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;font-weight:700;text-align:center;background:#fff;}
+.inv-row.edited .inv-inp{border-color:var(--gold);}
+.inv-clr{width:30px;height:30px;background:#fdecea;color:var(--red);border:none;border-radius:7px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.inv-resumo{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14px;}
+.fab-inv{position:fixed;bottom:16px;right:14px;left:14px;padding:15px;background:#e67e22;color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;z-index:10;touch-action:manipulation;}
+
+/* CONTAGEM */
+.cnt-item{display:flex;align-items:center;gap:7px;padding:9px 0;border-bottom:1px solid #f5f5f5;}
+.cnt-item:last-child{border:none;}
+.cnt-item.ok{background:#f1f8f1;padding:8px 8px;border-radius:8px;margin:2px 0;border-bottom:none;}
+.cnt-total{width:40px;text-align:center;font-size:15px;font-weight:700;color:var(--navy);}
+.cnt-total.z{color:#bbb;font-weight:400;font-size:13px;}
+.cnt-inp{width:66px;padding:7px 5px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;font-weight:700;text-align:center;}
+.cnt-add{width:40px;height:40px;background:var(--navy);color:#fff;border:none;border-radius:9px;font-size:22px;cursor:pointer;touch-action:manipulation;flex-shrink:0;}
+.cnt-clr{width:30px;height:30px;background:#fdecea;color:var(--red);border:none;border-radius:7px;font-size:13px;cursor:pointer;touch-action:manipulation;flex-shrink:0;}
+.fab{position:fixed;bottom:16px;right:14px;left:14px;padding:15px;background:var(--navy);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;z-index:10;touch-action:manipulation;}
+
+/* IMPORT VENDAS */
+.import-box{background:var(--card);border-radius:12px;padding:14px;border:1px solid var(--border);margin-bottom:14px;}
+.import-box textarea{width:100%;height:130px;font-family:monospace;font-size:12px;padding:10px;border:1.5px solid var(--border);border-radius:9px;resize:vertical;background:#fafafa;}
+
+/* PEDIDOS */
+.ped-layout{display:flex;flex-direction:column;gap:12px;}
+.ped-header,.ped-selecao,.ped-itens{background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px;}
+.ped-header h3,.ped-selecao h3,.ped-itens h3{font-size:14px;font-weight:600;color:var(--navy);margin-bottom:10px;}
+.ped-campos{display:flex;flex-wrap:wrap;gap:8px;}
+.ped-campos label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);}
+.ped-campos input,.ped-campos select{padding:8px 11px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;background:#fff;color:var(--text);}
+.ped-lista{max-height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+.ped-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f5f5f5;cursor:pointer;}
+.ped-item:last-child{border:none;}
+.ped-item:hover{background:#f8f9fb;}
+.ped-item.sel{background:#e8f0fe;}
+.ped-item input[type=checkbox]{width:18px;height:18px;cursor:pointer;accent-color:var(--navy);}
+.pi-nome{flex:1;font-size:13px;line-height:1.3;}
+.pi-cat{font-size:11px;color:var(--muted);}
+.pi-est{width:48px;text-align:right;font-size:13px;font-weight:600;}
+.ped-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #f5f5f5;}
+.ped-row:last-child{border:none;}
+.pr-nome{flex:1;font-size:13px;}
+.pr-est{width:44px;text-align:center;font-size:12px;color:var(--muted);}
+.pr-del{width:30px;height:30px;background:#fdecea;color:var(--red);border:none;border-radius:7px;font-size:14px;cursor:pointer;}
+.ped-totals{background:var(--navy);color:#fff;border-radius:10px;padding:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:12px;}
+.ped-totals span{font-size:13px;opacity:.8;}
+.ped-totals b{font-size:20px;}
+.ped-actions{display:flex;gap:8px;margin-top:12px;}
+.ped-actions button{flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;}
+.btn-ped-pdf{background:var(--navy);color:#fff;}
+.btn-ped-clear{background:#f5f5f5;color:var(--text);}
+
+/* RELATÓRIOS */
+.rel-grid{display:flex;flex-direction:column;gap:10px;}
+.rel-section{background:var(--card);border-radius:12px;border:1px solid var(--border);overflow:hidden;}
+.rel-section h3{font-size:14px;font-weight:600;color:var(--navy);padding:12px 14px 0;}
+.rel-section p.sub{font-size:12px;color:var(--muted);padding:2px 14px 8px;}
+.rel-controls{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 10px;align-items:center;}
+.rel-controls input,.rel-controls select{padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:#fff;}
+.rel-controls button{padding:7px 14px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-run{background:var(--navy);color:#fff;}
+.btn-pdf{background:#e8eef7;color:var(--navy);}
+.rel-body{padding:0 14px 14px;overflow-x:auto;}
+.rel-body table{width:100%;border-collapse:collapse;font-size:12px;}
+.rel-body th{padding:7px 8px;text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);white-space:nowrap;}
+.rel-body td{padding:7px 8px;border-bottom:1px solid #f5f5f5;vertical-align:middle;}
+.rel-body tr:last-child td{border:none;}
+.rel-body tr.total td{font-weight:700;background:#f9f9f9;border-top:1px solid var(--border);}
+.rel-empty{text-align:center;color:var(--muted);padding:20px;font-size:13px;}
+.alert-tag{display:inline-block;padding:2px 7px;border-radius:99px;font-size:11px;font-weight:600;}
+.alert-tag.crit{background:#fdecea;color:#c0392b;}
+.alert-tag.warn{background:#fff8e1;color:#f39c12;}
+.alert-tag.ok{background:#e8f5e9;color:#1e8449;}
+
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 20px;border-radius:9px;font-size:14px;z-index:100;display:none;white-space:nowrap;max-width:90%;text-align:center;}
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup">
+  <div class="setup-box">
+    <h1>&#128230; Estoque Bar</h1>
+    <p>Conecte o app ao Google Sheets para começar. Siga o arquivo <code>INSTRUCOES.md</code>, obtenha o URL do Apps Script e cole abaixo.</p>
+    <ol>
+      <li>Abra o Google Sheets e vá em <code>Extensões → Apps Script</code></li>
+      <li>Cole o código do arquivo <code>apps_script.gs</code> e salve</li>
+      <li>Publique como App da Web e copie o URL</li>
+      <li>Cole o URL abaixo e toque em Conectar</li>
+    </ol>
+    <input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/...">
+    <button class="btn-primary" onclick="conectar()">Conectar ao Google Sheets</button>
+    <p id="setupErr" style="color:var(--red);font-size:13px;margin-top:10px;display:none;"></p>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p id="loadMsg" style="color:var(--muted);font-size:14px;">Carregando...</p>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <h1>&#128230; Estoque Bar</h1>
+    <button onclick="sincronizar()">&#8635;</button>
+    <button onclick="desconectar()">&#9881;</button>
+    <button id="btnInstalar" onclick="instalarApp()">&#11015; Instalar</button>
+  </header>
+
+  <div class="tabs">
+    <button class="tab on" data-pane="dash">Dashboard</button>
+    <button class="tab" data-pane="estoque">Estoque</button>
+    <button class="tab" data-pane="inventario">Inventário</button>
+    <button class="tab" data-pane="contagem">Contagem</button>
+    <button class="tab" data-pane="entradas">Entradas</button>
+    <button class="tab" data-pane="vendas">Vendas</button>
+    <button class="tab" data-pane="produtos">Produtos</button>
+    <button class="tab" data-pane="pedidos">Pedidos</button>
+    <button class="tab" data-pane="relatorios">Relatórios</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="pane on" id="pane-dash">
+    <div class="kpis" id="kpiGrid"></div>
+    <div class="sec">Faturamento por categoria</div>
+    <div class="chart-wrap" style="height:260px;"><canvas id="cCat" role="img" aria-label="Faturamento por categoria"></canvas></div>
+    <div class="sec">Maiores faltas por valor</div>
+    <div class="chart-wrap"><canvas id="cFaltas" role="img" aria-label="Faltas de estoque"></canvas></div>
+    <div class="sec">Mais vendidos em quantidade</div>
+    <div class="chart-wrap"><canvas id="cVendas" role="img" aria-label="Mais vendidos"></canvas></div>
+  </div>
+
+  <!-- ESTOQUE -->
+  <div class="pane" id="pane-estoque">
+    <div class="row-date">
+      <label>Ver estoque em:
+        <input type="date" id="estData">
+      </label>
+      <select class="filter-sel" id="estFiltro">
+        <option value="todos">Todos os produtos</option>
+        <option value="falta">Somente faltas</option>
+        <option value="sobra">Somente sobras</option>
+        <option value="ok">Sem divergência</option>
+      </select>
+    </div>
+    <div class="srch-row">
+      <input class="srch" id="srchEst" placeholder="Buscar produto...">
+      <select class="filter-sel" id="catEst"><option value="">Todas as categorias</option></select>
+    </div>
+    <p class="count-info" id="estCount"></p>
+    <div class="tscroll">
+      <table>
+        <thead><tr>
+          <th>Produto</th><th>Cat.</th>
+          <th style="text-align:center;">Esperado</th>
+          <th style="text-align:center;">Última contagem</th>
+          <th style="text-align:center;">Diferença</th>
+          <th style="text-align:right;">Valor dif.</th>
+        </tr></thead>
+        <tbody id="tbEst"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- INVENTÁRIO -->
+  <div class="pane" id="pane-inventario">
+    <div class="row-date" style="margin-bottom:8px;">
+      <label>Data do inventário:
+        <input type="date" id="invData">
+      </label>
+      <select class="filter-sel" id="invFiltro">
+        <option value="todos">Todos os produtos</option>
+        <option value="alterado">Somente alterados</option>
+        <option value="falta">Somente faltas</option>
+      </select>
+    </div>
+    <div class="srch-row">
+      <input class="srch" id="srchInv" placeholder="Buscar produto...">
+      <select class="filter-sel" id="catInv"><option value="">Todas as categorias</option></select>
+    </div>
+    <div class="inv-resumo" id="invResumo">Faça a contagem e toque em Salvar Inventário.</div>
+    <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+      O campo já vem preenchido com o estoque esperado. Altere somente os que estiverem diferentes.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 54px 80px 36px 30px;gap:4px;padding:6px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:11px;color:var(--muted);font-weight:500;">PRODUTO</span>
+      <span style="font-size:11px;color:var(--muted);text-align:center;">ESPERADO</span>
+      <span style="font-size:11px;color:var(--muted);text-align:center;">CONTADO</span>
+      <span style="font-size:11px;color:var(--muted);text-align:center;">DIF.</span>
+      <span></span>
+    </div>
+    <div id="invLista"></div>
+    <button class="fab-inv" onclick="salvarInventario()">&#128190; Salvar Inventário</button>
+  </div>
+
+  <!-- CONTAGEM -->
+  <div class="pane" id="pane-contagem">
+    <div class="form-row" style="margin-bottom:10px;">
+      <label>Data<input type="date" id="cntData"></label>
+      <label>Responsável<input type="text" id="cntResp" placeholder="Nome" style="width:130px;"></label>
+    </div>
+    <div class="srch-row">
+      <input class="srch" id="srchCnt" placeholder="Buscar produto...">
+      <select class="filter-sel" id="catCnt"><option value="">Todas as categorias</option></select>
+      <select class="filter-sel" id="filtCnt">
+        <option value="todos">Todos</option>
+        <option value="pend">Pendentes</option>
+        <option value="ok">Conferidos</option>
+      </select>
+    </div>
+    <p id="cntStats" style="font-size:13px;color:var(--muted);margin-bottom:10px;"></p>
+    <div id="cntList"></div>
+    <button class="fab" onclick="salvarContagem()">&#128190; Salvar contagem do dia</button>
+  </div>
+
+  <!-- ENTRADAS -->
+  <div class="pane" id="pane-entradas">
+    <div class="form-row">
+      <label>Data<input type="date" id="entData"></label>
+      <label style="flex:2;min-width:160px;">Produto
+        <select id="entSku" style="width:100%;"><option value="">Selecione...</option></select>
+      </label>
+      <label>Qtd<input type="number" id="entQtd" min="0" placeholder="0" style="width:72px;"></label>
+      <label>Custo unit (R$)<input type="number" id="entCusto" min="0" step="0.01" placeholder="0.00" style="width:95px;"></label>
+      <label>Fornecedor<input type="text" id="entForn" placeholder="Nome" style="width:120px;"></label>
+      <label>Nota Fiscal<input type="text" id="entNota" placeholder="NF-001" style="width:90px;"></label>
+      <button class="btn" onclick="addEntrada()">+ Registrar</button>
+    </div>
+    <div class="srch-row">
+      <input class="srch" id="srchEnt" placeholder="Buscar entradas...">
+      <select class="filter-sel" id="catEnt"><option value="">Todas as categorias</option></select>
+    </div>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Data</th><th>Produto</th><th>Cat.</th><th>Qtd</th><th>Custo unit</th><th>Total</th><th>Fornecedor</th><th>NF</th><th></th></tr></thead>
+        <tbody id="tbEnt"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- VENDAS -->
+  <div class="pane" id="pane-vendas">
+    <div class="import-box">
+      <div class="sec" style="margin-top:0;">Importar relatório de vendas</div>
+      <div class="form-row"><label>Data<input type="date" id="vndData"></label></div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:8px;">Cole as linhas do Excel (sem cabeçalho): SKU · Qtd · Vlr unit · Faturado · Custo · Lucro</p>
+      <textarea id="vndTA" placeholder="STELLA ARTOIS 600 ml&#9;199&#9;19&#9;3781&#9;1506&#9;2275"></textarea>
+      <button class="btn-primary" style="margin-top:10px;" onclick="importarVendas()">Importar vendas</button>
+    </div>
+    <div class="srch-row">
+      <input class="srch" id="srchVnd" placeholder="Buscar vendas...">
+      <select class="filter-sel" id="catVnd"><option value="">Todas as categorias</option></select>
+    </div>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>Data</th><th>Produto</th><th>Cat.</th><th>Qtd</th><th>Faturado</th><th>Custo</th><th>Lucro</th><th></th></tr></thead>
+        <tbody id="tbVnd"></tbody>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- PRODUTOS -->
+  <div class="pane" id="pane-produtos">
+    <!-- Cadastrar novo produto -->
+    <div style="background:var(--card);border-radius:12px;border:1px solid var(--border);padding:14px;margin-bottom:14px;">
+      <div class="sec" style="margin-top:0;">&#43; Cadastrar novo produto</div>
+      <div class="form-row">
+        <label style="flex:2;min-width:180px;">Nome do produto
+          <input type="text" id="novSku" placeholder="Ex: HEINEKEN 600ML" style="width:100%;text-transform:uppercase;">
+        </label>
+        <label>Categoria
+          <select id="novCat" style="width:150px;"><option value="">Selecione...</option></select>
+        </label>
+        <label>Custo unit (R$)
+          <input type="number" id="novCusto" min="0" step="0.01" placeholder="0.00" style="width:95px;">
+        </label>
+        <label>Preco venda (R$)
+          <input type="number" id="novVenda" min="0" step="0.01" placeholder="0.00" style="width:95px;">
+        </label>
+        <label>Estoque min
+          <input type="number" id="novMin" min="0" placeholder="0" style="width:80px;">
+        </label>
+        <button class="btn" onclick="addProduto()">&#43; Cadastrar</button>
+      </div>
+    </div>
+
+    <!-- Lista de produtos -->
+    <div class="srch-row">
+      <input class="srch" id="srchProd" placeholder="Buscar produto...">
+      <select class="filter-sel" id="catProd"><option value="">Todas as categorias</option></select>
+    </div>
+    <p class="count-info" id="prodCount"></p>
+    <div class="tscroll">
+      <table>
+        <thead><tr>
+          <th>Produto</th>
+          <th>Categoria</th>
+          <th style="text-align:right;">Custo unit</th>
+          <th style="text-align:right;">Preco venda</th>
+          <th style="text-align:center;">Est. min</th>
+        </tr></thead>
+        <tbody id="tbProd"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PEDIDOS -->
+  <div class="pane" id="pane-pedidos">
+    <div class="ped-layout">
+      <div class="ped-header">
+        <h3>&#128230; Novo Pedido</h3>
+        <div class="ped-campos">
+          <label>Fornecedor<input type="text" id="pedForn" placeholder="Nome do fornecedor" style="width:180px;"></label>
+          <label>Data do pedido<input type="date" id="pedData"></label>
+          <label>Prev. entrega<input type="date" id="pedEntrega"></label>
+          <label>Observacoes<input type="text" id="pedObs" placeholder="Opcional" style="width:200px;"></label>
+        </div>
+      </div>
+      <div class="ped-selecao">
+        <h3>Selecionar produtos</h3>
+        <div class="srch-row" style="margin-bottom:8px;">
+          <input class="srch" id="srchPed" placeholder="Buscar produto...">
+          <select class="filter-sel" id="catPed"><option value="">Todas as categorias</option></select>
+        </div>
+        <div class="ped-lista" id="pedLista"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+          <span id="pedSelCount" style="font-size:12px;color:var(--muted);">0 selecionados</span>
+          <button onclick="addSelecionados()" style="padding:8px 16px;background:var(--navy);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">+ Adicionar ao pedido</button>
+        </div>
+      </div>
+      <div class="ped-itens" id="pedItensBox" style="display:none;">
+        <h3>Itens do pedido</h3>
+        <div style="display:grid;grid-template-columns:1fr 44px 80px 90px 30px;gap:4px;padding:6px 0;border-bottom:1px solid var(--border);">
+          <span style="font-size:11px;color:var(--muted);font-weight:500;">PRODUTO</span>
+          <span style="font-size:11px;color:var(--muted);text-align:center;">ATUAL</span>
+          <span style="font-size:11px;color:var(--muted);text-align:center;">PEDIR</span>
+          <span style="font-size:11px;color:var(--muted);text-align:right;">PRECO R$</span>
+          <span></span>
+        </div>
+        <div id="pedItensLista"></div>
+        <div class="ped-totals">
+          <div><span>Itens</span><br><b id="pedTotItens">0</b></div>
+          <div><span>Unidades</span><br><b id="pedTotUnid">0</b></div>
+          <div><span>Valor total</span><br><b id="pedTotVal">R$ 0,00</b></div>
+        </div>
+        <div class="ped-actions">
+          <button class="btn-ped-pdf" onclick="gerarPedidoPDF()">&#128438; Gerar PDF</button>
+          <button class="btn-ped-clear" onclick="limparPedido()">&#128465; Limpar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RELATÓRIOS -->
+  <div class="pane" id="pane-relatorios">
+    <div class="rel-grid">
+
+      <div class="rel-section" id="relR1">
+        <h3>&#128202; Estoque por período</h3>
+        <p class="sub">Esperado inicial, movimentos e situação final no período</p>
+        <div class="rel-controls">
+          <label style="font-size:12px;color:var(--muted);">De<br><input type="date" id="r1date"></label>
+          <label style="font-size:12px;color:var(--muted);">Até<br><input type="date" id="r1dateFim"></label>
+          <select id="r1cat"><option value="">Todas as categorias</option></select>
+          <button class="btn-run" onclick="runR1()">&#9654; Gerar</button>
+          <button class="btn-pdf" onclick="pdfRel('relR1')">&#128438; PDF</button>
+        </div>
+        <div class="rel-body" id="r1body"></div>
+      </div>
+
+      <div class="rel-section" id="relR2">
+        <h3>&#9888;&#65039; Itens abaixo do estoque mínimo</h3>
+        <p class="sub">Alertas de reposição em tempo real</p>
+        <div class="rel-controls">
+          <select id="r2cat"><option value="">Todas as categorias</option></select>
+          <button class="btn-run" onclick="runR2()">&#9654; Gerar</button>
+          <button class="btn-pdf" onclick="pdfRel('relR2')">&#128438; PDF</button>
+        </div>
+        <div class="rel-body" id="r2body"></div>
+      </div>
+
+      <div class="rel-section" id="relR3">
+        <h3>&#128200; CMV por categoria</h3>
+        <p class="sub">Custo da Mercadoria Vendida vs faturamento</p>
+        <div class="rel-controls">
+          <button class="btn-run" onclick="runR3()">&#9654; Gerar</button>
+          <button class="btn-pdf" onclick="pdfRel('relR3')">&#128438; PDF</button>
+        </div>
+        <div class="rel-body" id="r3body"></div>
+      </div>
+
+      <div class="rel-section" id="relR4">
+        <h3>&#128181; Margem de lucro por produto</h3>
+        <p class="sub">Rentabilidade de cada item</p>
+        <div class="rel-controls">
+          <select id="r4cat"><option value="">Todas as categorias</option></select>
+          <select id="r4ord">
+            <option value="margem_desc">Maior margem %</option>
+            <option value="margem_asc">Menor margem %</option>
+            <option value="lucro_desc">Maior lucro R$</option>
+            <option value="fat_desc">Maior faturamento</option>
+          </select>
+          <button class="btn-run" onclick="runR4()">&#9654; Gerar</button>
+          <button class="btn-pdf" onclick="pdfRel('relR4')">&#128438; PDF</button>
+        </div>
+        <div class="rel-body" id="r4body"></div>
+      </div>
+
+      <div class="rel-section" id="relR5">
+        <h3>&#128260; Giro de estoque por categoria</h3>
+        <p class="sub">Velocidade de saída de cada grupo</p>
+        <div class="rel-controls">
+          <button class="btn-run" onclick="runR5()">&#9654; Gerar</button>
+          <button class="btn-pdf" onclick="pdfRel('relR5')">&#128438; PDF</button>
+        </div>
+        <div class="rel-body" id="r5body"></div>
+      </div>
+
+      <div class="rel-section" id="relR6">
+        <h3>&#128269; Histórico de perdas acumuladas</h3>
+        <p class="sub">Valor total de diferenças negativas ao longo do tempo</p>
+        <div class="rel-controls">
+          <select id="r6cat"><option value="">Todas as categorias</option></select>
+          <button class="btn-run" onclick="runR6()">&#9654; Gerar</button>
+          <button class="btn-pdf" onclick="pdfRel('relR6')">&#128438; PDF</button>
+        </div>
+        <div class="rel-body" id="r6body"></div>
+      </div>
+
+      <div class="rel-section" id="relR7">
+        <h3>&#127937; Ranking de quebras por produto</h3>
+        <p class="sub">Produtos que mais aparecem com falta nas contagens</p>
+        <div class="rel-controls">
+          <select id="r7cat"><option value="">Todas as categorias</option></select>
+          <button class="btn-run" onclick="runR7()">&#9654; Gerar</button>
+          <button class="btn-pdf" onclick="pdfRel('relR7')">&#128438; PDF</button>
+        </div>
+        <div class="rel-body" id="r7body"></div>
+      </div>
+
+      <div class="rel-section" id="relR8">
+        <h3>&#128666; Histórico de entradas por fornecedor</h3>
+        <p class="sub">Compras agrupadas por fornecedor</p>
+        <div class="rel-controls">
+          <select id="r8forn"><option value="">Todos os fornecedores</option></select>
+          <button class="btn-run" onclick="runR8()">&#9654; Gerar</button>
+          <button class="btn-pdf" onclick="pdfRel('relR8')">&#128438; PDF</button>
+        </div>
+        <div class="rel-body" id="r8body"></div>
+      </div>
+
+      <div class="rel-section" id="relR9">
+        <h3>&#128203; Custo de compra vs custo cadastrado</h3>
+        <p class="sub">Comparativo entre custo médio das entradas e o cadastro</p>
+        <div class="rel-controls">
+          <select id="r9cat"><option value="">Todas as categorias</option></select>
+          <button class="btn-run" onclick="runR9()">&#9654; Gerar</button>
+          <button class="btn-pdf" onclick="pdfRel('relR9')">&#128438; PDF</button>
+        </div>
+        <div class="rel-body" id="r9body"></div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="app.js"></script>
+<script>
+var deferredPrompt=null;
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('./sw.js').catch(function(e){console.log('SW error:',e);});
+  });
+}
+window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault(); deferredPrompt=e;
+  var b=document.getElementById('btnInstalar'); if(b)b.style.display='flex';
+});
+window.addEventListener('appinstalled',function(){
+  deferredPrompt=null;
+  var b=document.getElementById('btnInstalar'); if(b)b.style.display='none';
+});
+</script>
+</body>
+</html>
