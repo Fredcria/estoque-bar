@@ -61,9 +61,15 @@ async function api_post(payload){
 // Fórmula: último inventário anterior à data + entradas até a data - vendas até a data
 function calcEsperado(sku, dataRef){
   // 1. Encontrar o inventário mais recente <= dataRef
+  // Se houver mais de um no mesmo dia, pega o ÚLTIMO (índice maior = gravado por último)
   var invRows = db.inventarios
     .filter(function(i){ return i.sku===sku && String(i.data).slice(0,10)<=dataRef; })
-    .sort(function(a,b){ return String(b.data).localeCompare(String(a.data)); });
+    .sort(function(a,b){
+      var da=String(a.data).slice(0,10), db2=String(b.data).slice(0,10);
+      if(db2!==da) return db2.localeCompare(da);
+      // mesma data: pega o último da lista (índice maior)
+      return db.inventarios.lastIndexOf(b) - db.inventarios.lastIndexOf(a);
+    });
 
   var base = 0, baseData = '1900-01-01';
   if(invRows.length){
@@ -348,6 +354,7 @@ async function salvarInventario(){
   if(!data){ toast('Selecione a data do inventário',false); return; }
   if(!confirm('Confirmar inventário de '+fmt(data)+'? Isso vai substituir qualquer inventário desta data e virar o novo ponto zero do estoque.')) return;
 
+  // Montar todas as linhas
   var rows=[];
   db.produtos.forEach(function(p){
     var esp=calcEsperado(p.sku,data);
@@ -356,57 +363,41 @@ async function salvarInventario(){
     rows.push([data,p.sku,qtd]);
   });
 
-  var total=rows.length;
-  var LOTE=25;
-  var enviados=0;
-  var erros=0;
-
-  loading('Apagando inventário anterior...');
+  loading('Salvando inventário de '+rows.length+' produtos...');
   try{
-    // Lote 1: apaga o dia e grava os primeiros 25
-    var r1=await api_post({action:'salvarInventario',data:data,rows:rows.slice(0,LOTE)});
-    if(r1.error){ toast('Erro: '+r1.error,false); stopLoad(); return; }
-    enviados+=Math.min(LOTE,total);
+    var r=await api_post({action:'salvarInventario',data:data,rows:rows});
+    if(r && r.error){ toast('Erro: '+r.error,false); stopLoad(); return; }
 
-    // Lotes seguintes
-    for(var i=LOTE;i<rows.length;i+=LOTE){
-      loading('Gravando... '+enviados+' de '+total+' produtos');
-      var lote=rows.slice(i,i+LOTE);
-      var r2=await api_post({action:'appendInventario',data:data,rows:lote});
-      if(r2 && r2.error){ erros++; }
-      else{ enviados+=lote.length; }
-    }
-
-    // Limpar rascunho e avisar
     invRascunho={};
     stopLoad();
-    toast('Inventário salvo! '+enviados+' produtos gravados.'+(erros>0?' ('+erros+' erros)':''));
+    toast('Inventário salvo! '+rows.length+' produtos gravados.');
 
-    // Recarregar dados e ir para aba Estoque para confirmar
+    // Recarregar e ir para aba Estoque
     setTimeout(function(){
       loading('Atualizando dados...');
       carregar().then(function(){
         stopLoad();
-        // Ir para aba Estoque para mostrar o resultado
+        // Ir para aba Estoque
         document.querySelectorAll('.tab').forEach(function(b){b.className='tab';});
         document.querySelectorAll('.pane').forEach(function(p){p.className='pane';});
         var tabEst=document.querySelector('[data-pane="estoque"]');
-        if(tabEst){ tabEst.className='tab on'; }
+        if(tabEst) tabEst.className='tab on';
         var paneEst=document.getElementById('pane-estoque');
-        if(paneEst){ paneEst.className='pane on'; }
+        if(paneEst) paneEst.className='pane on';
         renderEstoque();
-        toast('Inventário salvo e aplicado! Veja o estoque atualizado.');
+        toast('Inventário aplicado! Estoque atualizado.');
       }).catch(function(){
         stopLoad();
-        toast('Salvo! Toque em Sincronizar (↺) para ver os dados atualizados.');
+        toast('Salvo! Toque em sincronizar (↺) para ver os dados.');
       });
-    },3000);
+    },2000);
 
   }catch(e){
     stopLoad();
-    toast('Erro: '+e.message,false);
+    toast('Erro de conexão. Tente novamente.',false);
   }
 }
+
 
 
 // ---- CONTAGEM DIÁRIA ----
